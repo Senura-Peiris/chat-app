@@ -1,0 +1,9 @@
+Chatme App:
+  Email: senurapieris@gmail.com
+  Pw: senura1234
+
+   email : senurapeiris7@gmail.com
+   pw: senura1234
+
+  .env file link
+  ATLAS_URI=mongodb+srv://senurapeiris7:HY4AozCGu5BZGsJV@cluster0.cdhisb6.mongodb.net/Chatme?retryWrites=true&w=majority
