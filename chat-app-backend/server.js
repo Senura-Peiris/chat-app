@@ -6,16 +6,29 @@ const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
 
-const authRoutes = require('./routes/auth');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
-const app = express();
+const usersRoutes = require('./routes/users');
+const authRoutes = require('./routes/auth');
+
+const app = express();  // Create the express app **before** using it
 const server = http.createServer(app); // Create HTTP server for socket.io
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// API Routes (place after app creation)
+app.use('/api/auth', authRoutes);
+app.use('/api/users', usersRoutes);
+
+// Static files (uploads)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Socket.IO setup
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:3000', // Frontend origin
+    origin: 'http://localhost:3000', // Your frontend origin
     methods: ['GET', 'POST']
   }
 });
@@ -26,7 +39,7 @@ io.on('connection', (socket) => {
 
   socket.on('send-message', (message) => {
     console.log('📩 Message received:', message);
-    io.emit('receive-message', message); // Broadcast to all clients
+    io.emit('receive-message', message); // Broadcast message to all clients
   });
 
   socket.on('disconnect', () => {
@@ -34,21 +47,11 @@ io.on('connection', (socket) => {
   });
 });
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-
-// API Routes
-app.use('/api/auth', authRoutes);
-
-// Static files (e.g., uploaded images/files)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 // Debugging ENV keys
 console.log("Loaded env keys:", Object.keys(process.env));
 console.log("ATLAS_URI:", process.env.ATLAS_URI);
 
-// MongoDB connection
+// Connect to MongoDB
 mongoose.connect(process.env.ATLAS_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
@@ -70,7 +73,7 @@ mongoose.connect(process.env.ATLAS_URI, {
 })
 .catch((err) => console.error('❌ MongoDB connection error:', err));
 
-// Start server (HTTP + WebSocket)
+// Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

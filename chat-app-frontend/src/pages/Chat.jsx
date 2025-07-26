@@ -1,9 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { io } from "socket.io-client";
 
-function Chat() {
+function Chat({ socket }) {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -15,7 +14,6 @@ function Chat() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [incomingInvite, setIncomingInvite] = useState(null);
-  const [socket, setSocket] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -39,24 +37,25 @@ function Chat() {
   }, [navigate]);
 
   useEffect(() => {
-    if (user) {
-      const newSocket = io("http://localhost:5000");
-      newSocket.emit("register", user._id);
-      setSocket(newSocket);
+    if (user && socket) {
+      socket.emit("register", user._id);
 
-      newSocket.on("receive_invite", ({ from }) => {
+      socket.on("receive_invite", ({ from }) => {
         setIncomingInvite(from);
       });
 
-      newSocket.on("invite_accepted", ({ by }) => {
+      socket.on("invite_accepted", ({ by }) => {
         alert(`Your chat invite was accepted by ${by.username}`);
         setActiveTab("privateMessages");
         fetchChats(user._id, localStorage.getItem("token"));
       });
 
-      return () => newSocket.disconnect();
+      return () => {
+        socket.off("receive_invite");
+        socket.off("invite_accepted");
+      };
     }
-  }, [user]);
+  }, [user, socket]);
 
   const fetchFriends = async (userId, token) => {
     try {
@@ -266,10 +265,18 @@ function Chat() {
                   {searchResults.map((result) => (
                     <li
                       key={result._id}
-                      className="bg-gray-800 p-2 rounded cursor-pointer hover:bg-gray-700"
+                      className="bg-gray-800 p-2 rounded cursor-pointer hover:bg-gray-700 flex items-center space-x-3"
                       onClick={() => startChatWithUser(result._id)}
                     >
-                      {result.username} ({result.email})
+                      <img
+                        src={`http://localhost:5000/uploads/${result.profileImage}`}
+                        alt={`${result.username} profile`}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                      <div>
+                        <div className="font-semibold">{result.username}</div>
+                        <div className="text-sm text-gray-400">{result.email}</div>
+                      </div>
                     </li>
                   ))}
                 </ul>
