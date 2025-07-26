@@ -4,6 +4,9 @@ import Login from './pages/Login';
 import Chat from './pages/Chat';
 import Register from './pages/Register';
 import './App.css';
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:5000'); // Same as your backend server port
 
 function App() {
   return (
@@ -11,7 +14,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/chat" element={<Chat />} />
+        {/* ✅ Pass socket as a prop */}
+        <Route path="/chat" element={<Chat socket={socket} />} />
       </Routes>
     </Router>
   );
