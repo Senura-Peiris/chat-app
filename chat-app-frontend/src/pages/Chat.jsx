@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { Bell } from "lucide-react";
 
 function Chat({ socket }) {
   const navigate = useNavigate();
@@ -14,6 +15,8 @@ function Chat({ socket }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [incomingInvite, setIncomingInvite] = useState(null);
+  const [notifPanelOpen, setNotifPanelOpen] = useState(false);
+  const notifPanelRef = useRef(null);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -42,6 +45,8 @@ function Chat({ socket }) {
 
       socket.on("receive_invite", ({ from }) => {
         setIncomingInvite(from);
+        // Optionally open notification panel automatically:
+        // setNotifPanelOpen(true);
       });
 
       socket.on("invite_accepted", ({ by }) => {
@@ -141,6 +146,7 @@ function Chat({ socket }) {
 
   const toggleDropdown = () => setDropdownOpen((prev) => !prev);
 
+  // Close dropdown if clicked outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -154,6 +160,27 @@ function Chat({ socket }) {
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [dropdownOpen]);
+
+  // Close notification panel if clicked outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        notifPanelRef.current &&
+        !notifPanelRef.current.contains(event.target) &&
+        !event.target.closest("button[aria-label='Notifications']")
+      ) {
+        setNotifPanelOpen(false);
+      }
+    };
+
+    if (notifPanelOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [notifPanelOpen]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -169,26 +196,39 @@ function Chat({ socket }) {
             className="text-3xl font-bold text-blue-400 relative z-10 cursor-pointer"
             style={{
               animation: "glow 2s ease-in-out infinite",
-              textShadow: "0 0 10px #3b82f6, 0 0 20px #3b82f6, 0 0 30px #3b82f6",
+              textShadow:
+                "0 0 10px #3b82f6, 0 0 20px #3b82f6, 0 0 30px #3b82f6",
             }}
           >
             Chatme
           </h2>
 
           {user && (
-            <div className="relative group" ref={dropdownRef}>
+            <div className="relative flex items-center space-x-3" ref={dropdownRef}>
               <img
                 src={`http://localhost:5000/uploads/${user.profileImage}`}
                 alt="profile"
                 className="w-10 h-10 rounded-full cursor-pointer object-cover border-2 border-blue-500"
                 onClick={toggleDropdown}
               />
-              <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 bg-black text-white text-sm px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                {user.username}
-              </div>
 
+              {/* Notification Bell Icon */}
+              <button
+                className="relative text-white hover:text-blue-400 focus:outline-none"
+                aria-label="Notifications"
+                onClick={() => setNotifPanelOpen((prev) => !prev)}
+                style={{ display: "flex", alignItems: "center" }}
+              >
+                <Bell className="w-6 h-6" />
+                {/* Red dot if there is an incoming invite */}
+                {incomingInvite && (
+                  <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-600"></span>
+                )}
+              </button>
+
+              {/* Dropdown menu */}
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-40 bg-white text-black rounded shadow-lg p-2 z-10">
+                <div className="absolute right-0 mt-12 w-40 bg-white text-black rounded shadow-lg p-2 z-10">
                   <p className="text-sm font-semibold mb-2">{user.username}</p>
                   <button
                     onClick={handleLogout}
@@ -273,31 +313,38 @@ function Chat({ socket }) {
                         alt={`${result.username} profile`}
                         className="w-8 h-8 rounded-full object-cover"
                       />
-                      <div>
-                        <div className="font-semibold">{result.username}</div>
-                        <div className="text-sm text-gray-400">{result.email}</div>
-                      </div>
+                      <span>{result.username}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             )}
 
-            <h2 className="text-xl mb-2">Your Friends</h2>
-            <ul className="list-disc list-inside text-gray-300">
-              {friends.length === 0 ? (
-                <li>No friends yet</li>
-              ) : (
-                friends.map((friend) => <li key={friend._id}>{friend.username}</li>)
-              )}
-            </ul>
+            {friends.length > 0 && (
+              <div>
+                <h2 className="text-xl mb-2">Your Friends</h2>
+                <ul className="space-y-2">
+                  {friends.map((friend) => (
+                    <li key={friend._id} className="bg-gray-800 p-2 rounded flex items-center space-x-3">
+                      <img
+                        src={`http://localhost:5000/uploads/${friend.profileImage}`}
+                        alt={`${friend.username} profile`}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                      <span>{friend.username}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === "groupCalls" && (
           <div>
             <h1 className="text-3xl font-bold mb-4">Group Calls</h1>
-            <p className="text-gray-400">Feature coming soon...</p>
+            {/* Placeholder for group calls content */}
+            <p className="text-gray-400">Group calls functionality coming soon.</p>
           </div>
         )}
 
@@ -305,18 +352,21 @@ function Chat({ socket }) {
           <div>
             <h1 className="text-3xl font-bold mb-4">Private Messages</h1>
             {chats.length === 0 ? (
-              <p className="text-gray-400">No chats yet</p>
+              <p className="text-gray-400">No private messages yet.</p>
             ) : (
-              <ul className="divide-y divide-gray-700">
+              <ul className="space-y-2">
                 {chats.map((chat) => (
                   <li
                     key={chat._id}
-                    className="py-3 cursor-pointer hover:bg-gray-800 rounded px-2"
+                    className="bg-gray-800 p-2 rounded cursor-pointer hover:bg-gray-700 flex items-center space-x-3"
+                    // Add your onClick to open chat here
                   >
-                    Chat with{" "}
-                    {chat.participants
-                      .filter((p) => p !== user._id)
-                      .join(", ")}
+                    <img
+                      src={`http://localhost:5000/uploads/${chat.friend.profileImage}`}
+                      alt={`${chat.friend.username} profile`}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                    <span>{chat.friend.username}</span>
                   </li>
                 ))}
               </ul>
@@ -325,35 +375,60 @@ function Chat({ socket }) {
         )}
       </main>
 
-      {/* Incoming Chat Invite Modal */}
-      {incomingInvite && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-          <div className="bg-white text-black p-6 rounded-lg shadow-lg text-center">
-            <h2 className="text-xl font-semibold mb-4">
-              {incomingInvite.username} invited you to chat.
-            </h2>
-            <button
-              className="bg-blue-600 text-white px-4 py-2 rounded mr-2"
-              onClick={() => {
-                socket.emit("accept_invite", {
-                  from: incomingInvite.id,
-                  to: { id: user._id, username: user.username },
-                });
-                setIncomingInvite(null);
-                setActiveTab("privateMessages");
-              }}
-            >
-              Accept
-            </button>
-            <button
-              className="bg-gray-500 text-white px-4 py-2 rounded"
-              onClick={() => setIncomingInvite(null)}
-            >
-              Decline
-            </button>
-          </div>
+      {/* Notification Panel */}
+      <div
+        ref={notifPanelRef}
+        className={`fixed top-0 right-0 h-full w-80 bg-gray-800 shadow-lg z-50 transform transition-transform duration-300 flex flex-col ${
+          notifPanelOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+          <h2 className="text-xl font-semibold">Notifications</h2>
+          <button
+            onClick={() => setNotifPanelOpen(false)}
+            className="text-gray-400 hover:text-white"
+            aria-label="Close notifications"
+          >
+            ✕
+          </button>
         </div>
-      )}
+
+        <div className="flex-grow overflow-y-auto p-4 space-y-4">
+          {/* Incoming invites */}
+          {incomingInvite ? (
+            <div className="bg-gray-700 rounded p-3">
+              <p className="mb-2">
+                <strong>{incomingInvite.username}</strong> invited you to chat.
+              </p>
+              <button
+                onClick={() => {
+                  socket.emit("accept_invite", {
+                    from: incomingInvite.id,
+                    to: { id: user._id, username: user.username },
+                  });
+                  setIncomingInvite(null);
+                  setActiveTab("privateMessages");
+                  setNotifPanelOpen(false);
+                }}
+                className="bg-blue-600 px-3 py-1 rounded mr-2 hover:bg-blue-700"
+              >
+                Accept
+              </button>
+              <button
+                onClick={() => {
+                  setIncomingInvite(null);
+                }}
+                className="bg-gray-600 px-3 py-1 rounded hover:bg-gray-500"
+              >
+                Decline
+              </button>
+            </div>
+          ) : (
+            <p className="text-gray-400">No new invitations.</p>
+          )}
+          {/* Additional notifications can go here */}
+        </div>
+      </div>
 
       {/* Glow animation */}
       <style>{`

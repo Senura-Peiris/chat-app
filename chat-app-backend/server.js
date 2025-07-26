@@ -18,11 +18,11 @@ const server = http.createServer(app); // Create HTTP server for socket.io
 app.use(cors());
 app.use(express.json());
 
-// API Routes (place after app creation)
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 
-// Static files (uploads)
+// Static files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Socket.IO setup
@@ -33,21 +33,69 @@ const io = new Server(server, {
   }
 });
 
+// User to socket mapping
+const connectedUsers = new Map(); // userId => socket.id
+
 // Handle socket connections
 io.on('connection', (socket) => {
   console.log('🔌 New client connected:', socket.id);
 
-  socket.on('send-message', (message) => {
-    console.log('📩 Message received:', message);
-    io.emit('receive-message', message); // Broadcast message to all clients
+  // Register user and map userId to socket
+  socket.on('register', (userId) => {
+    connectedUsers.set(userId, socket.id);
+    console.log(`✅ Registered user: ${userId} with socket: ${socket.id}`);
   });
 
+  // Handle public message (optional legacy)
+  socket.on('send-message', (message) => {
+    console.log('📩 Message received:', message);
+    io.emit('receive-message', message); // broadcast to all
+  });
+
+  // Handle invite from user A to user B
+  socket.on('send_invite', ({ from, to }) => {
+    const toSocketId = connectedUsers.get(to);
+    if (toSocketId) {
+      io.to(toSocketId).emit('receive_invite', { from });
+      console.log(`📨 Invite sent from ${from.username} to ${to}`);
+    } else {
+      console.log(`⚠️ User ${to} not connected`);
+    }
+  });
+
+  // Handle accept invite
+  socket.on('accept_invite', ({ from, to }) => {
+    const fromSocketId = connectedUsers.get(from);
+    if (fromSocketId) {
+      io.to(fromSocketId).emit('invite_accepted', { by: to });
+      console.log(`✅ ${to.username} accepted invite from ${from}`);
+    }
+  });
+
+  // Handle private messages
+  socket.on('send-private-message', ({ to, message }) => {
+    const toSocketId = connectedUsers.get(to);
+    if (toSocketId) {
+      io.to(toSocketId).emit('receive-private-message', message);
+      console.log(`📬 Private message sent from ${message.senderId} to ${to}`);
+    } else {
+      console.log(`⚠️ User ${to} not connected`);
+    }
+  });
+
+  // Handle disconnection
   socket.on('disconnect', () => {
-    console.log('❌ Client disconnected:', socket.id);
+    for (const [userId, sockId] of connectedUsers.entries()) {
+      if (sockId === socket.id) {
+        connectedUsers.delete(userId);
+        console.log(`❌ User disconnected: ${userId}`);
+        break;
+      }
+    }
   });
 });
 
-// Debugging ENV keys
+// Debug environment variables
 console.log("Loaded env keys:", Object.keys(process.env));
 console.log("ATLAS_URI:", process.env.ATLAS_URI);
 
